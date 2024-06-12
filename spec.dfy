@@ -14,13 +14,13 @@ datatype Image = Image(desc : Desc, data : seq<byte>)
   // ImageRGB(desc : Desc, dataRGB : seq<RGB>)
   // | ImageRGBA(desc : Desc, dataRGBA : seq<RGBA>)
 
-function method hashRGBA(color : RGBA) : byte
+function hashRGBA(color : RGBA) : byte
   ensures 0 <= hashRGBA(color) <= 63
 {
   ((color.r as int * 3 + color.g as int * 5 + color.b as int * 7 + color.a as int * 11) % 64) as byte
 }
 
-function method hash(color : RGB) : byte
+function hash(color : RGB) : byte
   ensures 0 <= hash(color) <= 63
 {
   hashRGBA(RGBA(color.r, color.g, color.b, 255))
@@ -46,7 +46,7 @@ newtype {:nativeType "short"} Diff16 = x : int | -8 <= x <= 7
 //   // }
 // }
 
-predicate method validImage(image : Image)
+predicate validImage(image : Image)
 {
   |image.data| == image.desc.width as int * image.desc.height as int * image.desc.channels as int
   // match image
@@ -72,24 +72,24 @@ datatype AEI = AEI(width : uint32, height : uint32, ops : seq<Op>)
 
 datatype State = State(prev : RGBA, index : seq<RGBA>)
 
-predicate validState(state : State)
+ghost predicate validState(state : State)
 {
   |state.index| == 64
 }
 
-function method updateState(previous : State, pixel : RGBA) : State
+function updateState(previous : State, pixel : RGBA) : State
   requires validState(previous)
   ensures validState(updateState(previous, pixel))
 {
   State(prev := pixel, index := previous.index[hashRGBA(pixel) := pixel])
 }
 
-function method initState() : State
+function initState() : State
 {
   State(prev := RGBA(0, 0, 0, 255), index := seq(64, i => RGBA(r := 0, g := 0, b := 0, a := 255)))
 }
 
-function method updateStateStar(previous : State, pixels : seq<RGBA>) : State
+function updateStateStar(previous : State, pixels : seq<RGBA>) : State
   requires validState(previous)
   ensures validState(updateStateStar(previous, pixels))
 {
@@ -123,7 +123,7 @@ lemma updateStateStarConcat(state : State,
   }
 }
 
-function method specDecodeOp(state : State, op : Op) : seq<RGBA>
+function specDecodeOp(state : State, op : Op) : seq<RGBA>
   requires validState(state)
 {
   match op
@@ -151,7 +151,7 @@ function method specDecodeOp(state : State, op : Op) : seq<RGBA>
   }
 }
 
-function method specOpsAux(ops : seq<Op>, state : State) : seq<RGBA>
+function specOpsAux(ops : seq<Op>, state : State) : seq<RGBA>
   requires validState(state)
 {
   if |ops| == 0 then 
@@ -205,12 +205,12 @@ lemma specOpsAuxAssoc(ops : seq<Op>, state : State)
   }
 }
 
-function method specOps(ops : seq<Op>) : seq<RGBA>
+function specOps(ops : seq<Op>) : seq<RGBA>
 {
   specOpsAux(ops, initState())
 }
 
-function method toByteStreamRGB(data : seq<RGBA>) : seq<byte>
+function toByteStreamRGB(data : seq<RGBA>) : seq<byte>
 {
   if |data| == 0 then
     []
@@ -218,7 +218,7 @@ function method toByteStreamRGB(data : seq<RGBA>) : seq<byte>
     [ data[0].r, data[0].g, data[0].b ] + toByteStreamRGB(data[1..])
 }
 
-function method toByteStreamRGBA(data : seq<RGBA>) : seq<byte>
+function toByteStreamRGBA(data : seq<RGBA>) : seq<byte>
 {
   if |data| == 0 then
     []
@@ -226,7 +226,7 @@ function method toByteStreamRGBA(data : seq<RGBA>) : seq<byte>
     [ data[0].r, data[0].g, data[0].b, data[0].a ] + toByteStreamRGBA(data[1..])
 }
 
-function method toByteStream(desc : Desc, data : seq<RGBA>) : seq<byte>
+function toByteStream(desc : Desc, data : seq<RGBA>) : seq<byte>
 {
   match (desc.channels)
   {
@@ -254,12 +254,12 @@ function method toByteStream(desc : Desc, data : seq<RGBA>) : seq<byte>
 //   stateOpsAux(ops, initState())
 // }
 
-predicate method validAEI(aei : AEI)
+predicate validAEI(aei : AEI)
 {
   |specOps(aei.ops)| == aei.width as int * aei.height as int
 }
 
-function method spec(aei : AEI) : seq<RGBA>
+function spec(aei : AEI) : seq<RGBA>
   requires validAEI(aei)
 {
   specOps(aei.ops)

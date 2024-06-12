@@ -1,25 +1,25 @@
 include "helper.dfy"
 include "spec.dfy"
 
-function method encodeDiff(diff : Diff) : byte
+function encodeDiff(diff : Diff) : byte
   ensures 0 <= encodeDiff(diff) <= 3
 {
   (diff as int + 2) as byte
 }
 
-function method encodeDiff64(diff : Diff64) : byte
+function encodeDiff64(diff : Diff64) : byte
   ensures 0 <= encodeDiff64(diff) <= 63
 {
   (diff as int + 32) as byte
 }
 
-function method encodeDiff16(diff : Diff16) : byte
+function encodeDiff16(diff : Diff16) : byte
   ensures 0 <= encodeDiff16(diff) <= 15
 {
   (diff as int + 8) as byte
 }
 
-function method encodeBits(op : Op) : seq<byte>
+function encodeBits(op : Op) : seq<byte>
   ensures validBits(encodeBits(op))
   ensures sizeBitEncoding(opTypeOfOp(op)) == |encodeBits(op)|
   ensures decodeBits(encodeBits(op)) == op
@@ -59,7 +59,7 @@ function method encodeBits(op : Op) : seq<byte>
 
 datatype OpType = TypeRun | TypeIndex | TypeDiff | TypeLuma | TypeRGB | TypeRGBA
 
-function method opTypeOfBits(bits : byte) : OpType
+function opTypeOfBits(bits : byte) : OpType
 {
   if bits == 254 then
     TypeRGB
@@ -75,7 +75,7 @@ function method opTypeOfBits(bits : byte) : OpType
     TypeIndex
 }
 
-function method opTypeOfOp(op : Op) : OpType
+function opTypeOfOp(op : Op) : OpType
 {
   match op
   {
@@ -99,7 +99,7 @@ lemma opTypeOfBits_correct(op : Op)
 {
 }
 
-function method sizeBitEncoding(opType : OpType) : int
+function sizeBitEncoding(opType : OpType) : int
 {
   match opType
   {
@@ -118,7 +118,7 @@ function method sizeBitEncoding(opType : OpType) : int
   }
 }
 
-function method validBits(bits : seq<byte>) : bool
+function validBits(bits : seq<byte>) : bool
 {
   |bits| > 0 &&
     match opTypeOfBits(bits[0])
@@ -142,7 +142,7 @@ function method validBits(bits : seq<byte>) : bool
     }
 }
 
-function method decodeBits(bits : seq<byte>) : Op
+function decodeBits(bits : seq<byte>) : Op
   requires validBits(bits)
 {
   match opTypeOfBits(bits[0])
@@ -172,7 +172,7 @@ function method decodeBits(bits : seq<byte>) : Op
   }
 }
 
-predicate method validBitSeq(bits : seq<byte>)
+predicate validBitSeq(bits : seq<byte>)
 {
   |bits| == 0 ||
     (
@@ -182,7 +182,7 @@ predicate method validBitSeq(bits : seq<byte>)
     validBitSeq(bits[len..]))
 }
 
-function method encodeBitSeq(ops : seq<Op>) : seq<byte>
+function encodeBitSeq(ops : seq<Op>) : seq<byte>
   ensures validBitSeq(encodeBitSeq(ops))
   ensures decodeBitSeqSure(encodeBitSeq(ops)) == ops
 {
@@ -192,7 +192,7 @@ function method encodeBitSeq(ops : seq<Op>) : seq<byte>
     encodeBits(ops[0]) + encodeBitSeq(ops[1..])
 }
 
-function method decodeBitSeqSure(bits : seq<byte>) : seq<Op>
+function decodeBitSeqSure(bits : seq<byte>) : seq<Op>
   requires validBitSeq(bits)
 {
   if |bits| == 0 then
@@ -229,7 +229,7 @@ method decodeBitSeq(bits : seq<byte>) returns (r : Option<seq<Op>>)
   }
 }
 
-function method genHeader(desc : Desc) : seq<byte>
+function genHeader(desc : Desc) : seq<byte>
   ensures validHeader(genHeader(desc))
   ensures specHeader(genHeader(desc)) == desc
 {
@@ -249,7 +249,7 @@ predicate validHeader(bits : seq<byte>)
     //exists desc :: bits == genHeader(desc)
 }
 
-function method specHeader(header : seq<byte>) : Desc
+function specHeader(header : seq<byte>) : Desc
   requires validHeader(header)
 {
   Desc(
@@ -260,7 +260,7 @@ function method specHeader(header : seq<byte>) : Desc
     )
 }
 
-predicate method validFooter(bits : seq<byte>)
+predicate validFooter(bits : seq<byte>)
 {
   bits == genFooter()
 }
@@ -277,7 +277,7 @@ predicate validByteStream(byteStream : seq<byte>)
     specHeader(byteStream[..14]).height as int
 }
 
-function method specEndToEnd(byteStream : seq<byte>) : Image
+function specEndToEnd(byteStream : seq<byte>) : Image
   requires validByteStream(byteStream)
 {
   var desc := specHeader(byteStream[..14]);
@@ -285,12 +285,12 @@ function method specEndToEnd(byteStream : seq<byte>) : Image
   Image(desc, toByteStream(desc, specOps(decodeBitSeqSure(byteStream[14..len-8]))))
 }
 
-function method genFooter() : seq<byte>
+function genFooter() : seq<byte>
 {
   seq(7, i => 0 as byte) + [ 1 as byte ]
 }
 
-function method byteFromColorSpace(colorSpace : ColorSpace) : byte
+function byteFromColorSpace(colorSpace : ColorSpace) : byte
 {
   match colorSpace
   {
@@ -301,12 +301,12 @@ function method byteFromColorSpace(colorSpace : ColorSpace) : byte
   }
 }
 
-predicate method validColorSpaceAsByte(b : byte)
+predicate validColorSpaceAsByte(b : byte)
 {
   b == 0 || b == 1
 }
 
-function method colorSpaceFromByte(b : byte) : ColorSpace
+function colorSpaceFromByte(b : byte) : ColorSpace
   requires validColorSpaceAsByte(b)
 {
   if b == 0 then

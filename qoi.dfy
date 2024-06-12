@@ -3,12 +3,12 @@ Dafny implementation of encoder and decoder for the QOI image format.
 
 https://qoiformat.org/qoi-specification.pdf
 
-(C) Stefan Ciobaca, May 2023
+(C) Stefan Ciobaca 2023-2024
  */
 include "spec.dfy"
 include "specbit.dfy"
 
-function method canDiff(curr : RGBA, prev : RGBA) : Option<RGBDiff>
+function canDiff(curr : RGBA, prev : RGBA) : Option<RGBDiff>
   ensures forall dr, dg, db : Diff :: canDiff(curr, prev) == Some(RGBDiff(dr, dg, db)) ==>
   curr.r == add_byte(prev.r, byte_from(dr as int)) && 
   curr.g == add_byte(prev.g, byte_from(dg as int)) && 
@@ -25,7 +25,7 @@ function method canDiff(curr : RGBA, prev : RGBA) : Option<RGBDiff>
     None
 }
 
-function method canLuma(curr : RGBA, prev : RGBA) : Option<RGBLuma>
+function canLuma(curr : RGBA, prev : RGBA) : Option<RGBLuma>
   ensures forall luma : RGBLuma// , dgr : Diff16 :: forall dg : Diff64 :: forall dgb : Diff16
   ::
   canLuma(curr, prev) == Some(luma) ==>
@@ -34,13 +34,18 @@ function method canLuma(curr : RGBA, prev : RGBA) : Option<RGBLuma>
   curr.b == add_byte(add_byte(prev.b, byte_from(luma.dg as int)), byte_from(luma.db as int))  && 
   curr.a == prev.a
 {
-  // assume false; // help speed up, will still compile without (but slower)
   var dr : int := curr.r as int - prev.r as int;
   var dg : int := curr.g as int - prev.g as int;
   var db : int := curr.b as int - prev.b as int;
   var da : int := curr.a as int - prev.a as int;
   if (-32 <= dg <= 31 && -8 <= (dr - dg) <= 7 && -8 <= (db - dg) <= 7 && da == 0) then
+    (
+    assert curr.a == prev.a;
+    assert curr.g == add_byte(prev.g, byte_from((dg as Diff64) as int));
+    assert curr.r == add_byte(add_byte(prev.r, byte_from((dg as Diff64) as int)), byte_from((dr - dg) as int));
+    assert curr.b == add_byte(add_byte(prev.b, byte_from((dg as Diff64) as int)), byte_from((db - dg) as int));
     Some(RGBLuma((dr - dg) as Diff16, dg as Diff64, (db - dg) as Diff16))
+      )
   else
     None
 }
@@ -130,13 +135,13 @@ method encodeAEI(image : seq<RGBA>) returns (r : seq<Op>)
   var wh : int := |image|;
   ghost var state := initState();
   while (i < wh)
-    invariant 0 <= i <= wh;
-    decreases wh - i;
+    invariant 0 <= i <= wh
+    decreases wh - i
     invariant state == updateStateStar(
-      initState(), image[..i]);
-    invariant state.prev == prev;
-    invariant state.index == index[..];
-    invariant specOps(ops) == image[..i];
+      initState(), image[..i])
+    invariant state.prev == prev
+    invariant state.index == index[..]
+    invariant specOps(ops) == image[..i]
   {
     var curr := image[i];
     ops := encodePixelAEI(curr, prev, index, state, ops);
@@ -163,9 +168,9 @@ method decodeAEI(ops : seq<Op>) returns (r : seq<RGBA>) // (r : Option<seq<RGBA>
   // var index : array<RGBA> := new RGBA[64](i => RGBA(r := 0, g := 0, b := 0, a := 255));
   var state := initState();
   while (i < |ops|)
-    invariant 0 <= i <= |ops|;
-    invariant state == updateStateStar(initState(), image);
-    invariant specOps(ops[..i]) == image;
+    invariant 0 <= i <= |ops|
+    invariant state == updateStateStar(initState(), image)
+    invariant specOps(ops[..i]) == image
 //    invariant aei.ops == ops;
 //    invariant aei.width == w;
 //    invariant aei.height == h;
@@ -191,10 +196,10 @@ method decodeAEI(ops : seq<Op>) returns (r : seq<RGBA>) // (r : Option<seq<RGBA>
   // }
 }
 
-function method asRGBA3(data : seq<byte>) : seq<RGBA>
-  requires |data| % 3 == 0;
+function asRGBA3(data : seq<byte>) : seq<RGBA>
+  requires |data| % 3 == 0
   ensures toByteStreamRGB(asRGBA3(data)) == data
-  ensures |asRGBA3(data)| == |data| / 3;
+  ensures |asRGBA3(data)| == |data| / 3
 {
   if |data| == 0 then
     []
@@ -202,10 +207,10 @@ function method asRGBA3(data : seq<byte>) : seq<RGBA>
     [ RGBA(data[0], data[1], data[2], 255) ] + asRGBA3(data[3..])
 }
 
-function method asRGBA4(data : seq<byte>) : seq<RGBA>
-  requires |data| % 4 == 0;
+function asRGBA4(data : seq<byte>) : seq<RGBA>
+  requires |data| % 4 == 0
   ensures toByteStreamRGBA(asRGBA4(data)) == data
-  ensures |asRGBA4(data)| == |data| / 4;
+  ensures |asRGBA4(data)| == |data| / 4
 {
   if |data| == 0 then
     []
@@ -213,10 +218,10 @@ function method asRGBA4(data : seq<byte>) : seq<RGBA>
     [ RGBA(data[0], data[1], data[2], data[3]) ] + asRGBA4(data[4..])
 }
 
-function method asRGBA(data : seq<byte>, desc : Desc) : seq<RGBA>
-  requires |data| == desc.width as int * desc.height as int * desc.channels as int;
+function asRGBA(data : seq<byte>, desc : Desc) : seq<RGBA>
+  requires |data| == desc.width as int * desc.height as int * desc.channels as int
   ensures toByteStream(desc, asRGBA(data, desc)) == data
-  ensures |asRGBA(data, desc)| == desc.width as int * desc.height as int;
+  ensures |asRGBA(data, desc)| == desc.width as int * desc.height as int
 {
   if desc.channels == 3 then
     asRGBA3(data)
@@ -309,8 +314,8 @@ method decodeAll(byteStream : seq<byte>) returns (r : Option<Image>)
 }
 
 method test(i : int) returns (r : seq<RGBA>)
-  requires 0 <= i <= 2;
-  ensures |r| == 3;
+  requires 0 <= i <= 2
+  ensures |r| == 3
 {
   var p1 := RGBA(1, 2, 3, 255);
   var p2 := RGBA(0, 1, 0, 255);
@@ -339,7 +344,7 @@ method test(i : int) returns (r : seq<RGBA>)
 }
 
 method test4() returns (r : Image)
-  ensures validImage(r);
+  ensures validImage(r)
 {
   var desc := Desc(4, 4, 3, Linear);
   var data := [
