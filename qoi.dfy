@@ -9,6 +9,7 @@ https://qoiformat.org/qoi-specification.pdf
 include "spec.dfy"
 include "specbit.dfy"
 
+// Check if two pixels are close enough to use delta encoding (type 1)
 function canDiff(curr : RGBA, prev : RGBA) : Option<RGBDiff>
   ensures forall dr, dg, db : Diff :: canDiff(curr, prev) == Some(RGBDiff(dr, dg, db)) ==>
   curr.r == add_byte(prev.r, byte_from(dr as int)) && 
@@ -26,6 +27,7 @@ function canDiff(curr : RGBA, prev : RGBA) : Option<RGBDiff>
     None
 }
 
+// Check if two pixels are close enough to use delta encoding (type 2)
 function canLuma(curr : RGBA, prev : RGBA) : Option<RGBLuma>
   ensures forall luma : RGBLuma// , dgr : Diff16 :: forall dg : Diff64 :: forall dgb : Diff16
   ::
@@ -51,6 +53,7 @@ function canLuma(curr : RGBA, prev : RGBA) : Option<RGBLuma>
     None
 }
 
+// Encode one pixel of the image
 method encodePixelAEI(curr : RGBA,
   prev : RGBA,
   index : array<RGBA>,
@@ -123,10 +126,8 @@ method encodePixelAEI(curr : RGBA,
   index[h] := curr;
 }
 
+// Encode all pixels in a image as a sequence of chunks
 method encodeAEI(image : seq<RGBA>) returns (r : seq<Op>)
-//  requires w >= 1
-//  requires h >= 1
-//  requires |image| == w as int * h as int
   ensures specOps(r) == image
 {
   var ops : seq<Op> := [];
@@ -155,26 +156,17 @@ method encodeAEI(image : seq<RGBA>) returns (r : seq<Op>)
   return ops;
 }
 
-method decodeAEI(ops : seq<Op>) returns (r : seq<RGBA>) // (r : Option<seq<RGBA>>)
+// Decode a sequence of chunks as the image data
+method decodeAEI(ops : seq<Op>) returns (r : seq<RGBA>)
   ensures r == specOps(ops)
-  // ensures validAEI(aei) ==> r.Some? && r.some == spec(aei)
-//  ensures !validAEI(aei) ==> r.None?
 {
   var i := 0;
-  //var ops := aei.ops;
-  //var w := aei.width;
-  //var h := aei.height;
   var image : seq<RGBA> := [];
-  // var prev : RGBA := RGBA(r := 0, g := 0, b := 0, a := 255);
-  // var index : array<RGBA> := new RGBA[64](i => RGBA(r := 0, g := 0, b := 0, a := 255));
   var state := initState();
   while (i < |ops|)
     invariant 0 <= i <= |ops|
     invariant state == updateStateStar(initState(), image)
     invariant specOps(ops[..i]) == image
-//    invariant aei.ops == ops;
-//    invariant aei.width == w;
-//    invariant aei.height == h;
   {
     ghost var image0 := image;
     ghost var state0 := state;
@@ -190,13 +182,9 @@ method decodeAEI(ops : seq<Op>) returns (r : seq<RGBA>) // (r : Option<seq<RGBA>
   }
   assert ops[..] == ops[..i];
   return image;
-  // if (|image| == w as int * h as int) {
-  //   return Some(image);
-  // } else {
-  //   return None;
-  // }
 }
 
+// Interpret a sequence of bytes as a sequence of RGB pixels
 function asRGBA3(data : seq<byte>) : seq<RGBA>
   requires |data| % 3 == 0
   ensures toByteStreamRGB(asRGBA3(data)) == data
@@ -208,6 +196,7 @@ function asRGBA3(data : seq<byte>) : seq<RGBA>
     [ RGBA(data[0], data[1], data[2], 255) ] + asRGBA3(data[3..])
 }
 
+// Interpret a sequence of bytes as a sequence of RGBA pixels
 function asRGBA4(data : seq<byte>) : seq<RGBA>
   requires |data| % 4 == 0
   ensures toByteStreamRGBA(asRGBA4(data)) == data
@@ -219,6 +208,7 @@ function asRGBA4(data : seq<byte>) : seq<RGBA>
     [ RGBA(data[0], data[1], data[2], data[3]) ] + asRGBA4(data[4..])
 }
 
+// Interpret a sequence of bytes as a sequence of RGBA pixels
 function asRGBA(data : seq<byte>, desc : Desc) : seq<RGBA>
   requires |data| == desc.width as int * desc.height as int * desc.channels as int
   ensures toByteStream(desc, asRGBA(data, desc)) == data
@@ -230,6 +220,7 @@ function asRGBA(data : seq<byte>, desc : Desc) : seq<RGBA>
     asRGBA4(data)
 }
 
+// Encode an image as a sequence of bytes
 method encodeAll(image : Image) returns (r : seq<byte>)
   requires validImage(image)
   ensures validByteStream(r)
@@ -248,7 +239,6 @@ method encodeAll(image : Image) returns (r : seq<byte>)
   assert footer == r[len - 8..];
   assert decodeBitSeqSure(r[14..len-8]) == ops;
   assert specOps(ops) == asRGBA(image.data, image.desc);
-  // assert decodeAEI(ops) == image.data;
   assert |r| >= 14 + 8;
   assert validHeader(r[..14]);
   assert validFooter(r[len - 8..]);
@@ -259,6 +249,7 @@ method encodeAll(image : Image) returns (r : seq<byte>)
   assert validByteStream(r);
 }
 
+// Extract image metadata from header
 method parseHeader(header : seq<byte>) returns (r : Option<Desc>)
   requires |header| == 14
   ensures validHeader(header) ==> r.Some? && r.some == specHeader(header)
@@ -282,6 +273,7 @@ method parseHeader(header : seq<byte>) returns (r : Option<Desc>)
   return None;
 }
 
+// Decode a sequence of bytes as an image
 method decodeAll(byteStream : seq<byte>) returns (r : Option<Image>)
   ensures !validByteStream(byteStream) ==> r.None?
   ensures validByteStream(byteStream) ==> r.Some? && r.some == specEndToEnd(byteStream)
@@ -313,4 +305,3 @@ method decodeAll(byteStream : seq<byte>) returns (r : Option<Image>)
     return Some(Image(desc, data));
   }
 }
-

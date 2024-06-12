@@ -9,24 +9,28 @@ https://qoiformat.org/qoi-specification.pdf
 include "helper.dfy"
 include "spec.dfy"
 
-function encodeDiff(diff : Diff) : byte
-  ensures 0 <= encodeDiff(diff) <= 3
-{
-  (diff as int + 2) as byte
-}
-
+// Signed delta as unsigned byte
 function encodeDiff64(diff : Diff64) : byte
   ensures 0 <= encodeDiff64(diff) <= 63
 {
   (diff as int + 32) as byte
 }
 
+// Signed delta as unsigned byte
 function encodeDiff16(diff : Diff16) : byte
   ensures 0 <= encodeDiff16(diff) <= 15
 {
   (diff as int + 8) as byte
 }
 
+// Signed delta as unsigned byte
+function encodeDiff(diff : Diff) : byte
+  ensures 0 <= encodeDiff(diff) <= 3
+{
+  (diff as int + 2) as byte
+}
+
+// Encode a chunk as a sequence of bytes
 function encodeBits(op : Op) : seq<byte>
   ensures validBits(encodeBits(op))
   ensures sizeBitEncoding(opTypeOfOp(op)) == |encodeBits(op)|
@@ -65,8 +69,10 @@ function encodeBits(op : Op) : seq<byte>
   }
 }
 
+// Types of chunks
 datatype OpType = TypeRun | TypeIndex | TypeDiff | TypeLuma | TypeRGB | TypeRGBA
 
+// Return the chunk type out of the first byte
 function opTypeOfBits(bits : byte) : OpType
 {
   if bits == 254 then
@@ -83,6 +89,7 @@ function opTypeOfBits(bits : byte) : OpType
     TypeIndex
 }
 
+// Extract the chunk type from a chunk
 function opTypeOfOp(op : Op) : OpType
 {
   match op
@@ -102,11 +109,13 @@ function opTypeOfOp(op : Op) : OpType
   }
 }
 
+// Sanity check
 lemma opTypeOfBits_correct(op : Op)
   ensures opTypeOfOp(op) == opTypeOfBits(encodeBits(op)[0])
 {
 }
 
+// Number of bytes in the encoding of each chunk type
 function sizeBitEncoding(opType : OpType) : int
 {
   match opType
@@ -126,6 +135,7 @@ function sizeBitEncoding(opType : OpType) : int
   }
 }
 
+// The byte sequence represents a valid encoding of a chunk
 function validBits(bits : seq<byte>) : bool
 {
   |bits| > 0 &&
@@ -150,6 +160,7 @@ function validBits(bits : seq<byte>) : bool
     }
 }
 
+// Decode a chunk-as-bits into an abstract chunk
 function decodeBits(bits : seq<byte>) : Op
   requires validBits(bits)
 {
@@ -180,6 +191,7 @@ function decodeBits(bits : seq<byte>) : Op
   }
 }
 
+// Check if a sequence of bytes represents a sequence of chunks
 predicate validBitSeq(bits : seq<byte>)
 {
   |bits| == 0 ||
@@ -190,6 +202,7 @@ predicate validBitSeq(bits : seq<byte>)
     validBitSeq(bits[len..]))
 }
 
+// Encode a sequence of chunks as a sequence of bytes
 function encodeBitSeq(ops : seq<Op>) : seq<byte>
   ensures validBitSeq(encodeBitSeq(ops))
   ensures decodeBitSeqSure(encodeBitSeq(ops)) == ops
@@ -200,6 +213,7 @@ function encodeBitSeq(ops : seq<Op>) : seq<byte>
     encodeBits(ops[0]) + encodeBitSeq(ops[1..])
 }
 
+// Decode a sequence of bytes as a sequence of chunks
 function decodeBitSeqSure(bits : seq<byte>) : seq<Op>
   requires validBitSeq(bits)
 {
@@ -212,6 +226,7 @@ function decodeBitSeqSure(bits : seq<byte>) : seq<Op>
     )
 }
 
+// Decode a sequence of bytes; return None if invalid
 method decodeBitSeq(bits : seq<byte>) returns (r : Option<seq<Op>>)
   ensures !validBitSeq(bits) ==> r.None?
   ensures validBitSeq(bits) ==> r.Some? && r.some == decodeBitSeqSure(bits)
@@ -237,6 +252,7 @@ method decodeBitSeq(bits : seq<byte>) returns (r : Option<seq<Op>>)
   }
 }
 
+// Create the header from the image metadata
 function genHeader(desc : Desc) : seq<byte>
   ensures validHeader(genHeader(desc))
   ensures specHeader(genHeader(desc)) == desc
@@ -248,6 +264,7 @@ function genHeader(desc : Desc) : seq<byte>
     + [ byteFromColorSpace(desc.colorSpace) ]
 }
 
+// Is this sequence of bytes a valid QOI header?
 predicate validHeader(bits : seq<byte>)
 {
   |bits| == 14 &&
@@ -257,6 +274,7 @@ predicate validHeader(bits : seq<byte>)
     //exists desc :: bits == genHeader(desc)
 }
 
+// Decode a header as metadata
 function specHeader(header : seq<byte>) : Desc
   requires validHeader(header)
 {
@@ -268,11 +286,18 @@ function specHeader(header : seq<byte>) : Desc
     )
 }
 
+// The footer consists of 7 zeroes and 1 one.
+function genFooter() : seq<byte>
+{
+  seq(7, i => 0 as byte) + [ 1 as byte ]
+}
+
 predicate validFooter(bits : seq<byte>)
 {
   bits == genFooter()
 }
 
+// The byteStream contains a valid image
 predicate validByteStream(byteStream : seq<byte>)
 {
   var len := |byteStream|;
@@ -285,6 +310,7 @@ predicate validByteStream(byteStream : seq<byte>)
     specHeader(byteStream[..14]).height as int
 }
 
+// Which image does the byteStream correspond to?
 function specEndToEnd(byteStream : seq<byte>) : Image
   requires validByteStream(byteStream)
 {
@@ -293,11 +319,7 @@ function specEndToEnd(byteStream : seq<byte>) : Image
   Image(desc, toByteStream(desc, specOps(decodeBitSeqSure(byteStream[14..len-8]))))
 }
 
-function genFooter() : seq<byte>
-{
-  seq(7, i => 0 as byte) + [ 1 as byte ]
-}
-
+// Convert colorSpace to/from a byte
 function byteFromColorSpace(colorSpace : ColorSpace) : byte
 {
   match colorSpace
@@ -322,4 +344,3 @@ function colorSpaceFromByte(b : byte) : ColorSpace
   else
     Linear
 }
-
