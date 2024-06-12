@@ -1,3 +1,11 @@
+/*
+Dafny implementation of encoder and decoder for the QOI image format.
+
+https://qoiformat.org/qoi-specification.pdf
+
+(C) Stefan Ciobaca 2023-2024
+ */
+
 include "qoi.dfy"
 
 method test(i : int) returns (r : seq<RGBA>)

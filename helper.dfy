@@ -1,3 +1,11 @@
+/*
+Dafny implementation of encoder and decoder for the QOI image format.
+
+https://qoiformat.org/qoi-specification.pdf
+
+(C) Stefan Ciobaca 2023-2024
+ */
+
 datatype Option<T> = None | Some(some:T)
 
 newtype {:nativeType "byte"} byte = x : int | 0 <= x < 256

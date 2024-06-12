@@ -5,6 +5,7 @@ https://qoiformat.org/qoi-specification.pdf
 
 (C) Stefan Ciobaca 2023-2024
  */
+
 include "spec.dfy"
 include "specbit.dfy"
 
