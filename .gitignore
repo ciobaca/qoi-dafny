@@ -1,2 +1,3 @@
+flycheck_*.dfy
 *.dll
 *.runtimeconfig.json
