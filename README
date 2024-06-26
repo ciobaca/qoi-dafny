@@ -1,5 +1,20 @@
-(C) 2023 Stefan Ciobaca
+(C) 2023-2024 Stefan Ciobaca
 Alexandru Ioan Cuza University
 stefan.ciobaca@gmail.com
 
-A specification and implementation of the Quite Ok Image Format in Dafny.
+A specification and implementation of the Quite Ok Image Format (https://qoiformat.org/qoi-specification.pdf) in Dafny.
+
+The folder `Functional` contains a verified implementation of the QOI format using (mostly) immutable data structures. This is a proof of concept that will work too slowly on anything but the smallest inputs.
+
+The folder `Imperative` contains a verified imperative implementation using (mostly) arrays. This implementation is reasonably fast. To build and run the executable:
+
+    dafny translate cs --include-runtime --unicode-char:false entry.dfy
+    dotnet run <inputfile>
+
+(you will need .NET installed on your computer)
+
+If the inputfile ends in `.rgb`, it is converted to `.qoi` and vice-versa.
+
+To simply verify the development:
+
+    dafny /vcsCores:8 /timeLimit:15 /trace helper.dfy spec.dfy specbit.dfy qoi.dfy
